@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Galaksi Gündem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+        :root { --space-black: #05070a; --space-blue: #3b82f6; --admin-bg: #0f172a; }
+        body { background-color: var(--space-black); color: #e2e8f0; font-family: 'Inter', sans-serif; }
+        .heading-font { font-family: 'Orbitron', sans-serif; }
+        .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        
+        /* Dashboard */
+        #admin-dashboard { display: none; position: fixed; inset: 0; z-index: 500; background: var(--admin-bg); overflow-y: auto; }
+        #admin-dashboard.active { display: block; }
+        .sidebar-link.active { background: rgba(59, 130, 246, 0.1); border-right: 4px solid var(--space-blue); color: var(--space-blue); }
+        
+        /* Modals & Toasts */
+        #news-modal { display: none; position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; }
+        #news-modal.active { display: flex; }
+        #toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px); opacity: 0; transition: all 0.4s; z-index: 1000; }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+        
+        .admin-only { display: none; }
+        body.is-admin .admin-only { display: flex; }
+    </style>
+</head>
+<body class="overflow-x-hidden">
+
+    <nav class="fixed w-full z-50 bg-black/80 backdrop-blur-md border-b border-white/10 h-16 flex items-center justify-between px-6">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
+            <i class="fas fa-rocket text-blue-500 text-2xl"></i>
+            <span class="heading-font text-xl font-bold text-white">ASTRO<span class="text-blue-500">HABER</span></span>
+        </div>
+        <button onclick="openLoginPrompt()" class="text-gray-500 hover:text-white"><i class="fas fa-user-shield"></i></button>
+    </nav>
+
+    <section class="h-[50vh] flex items-center justify-center relative pt-16">
+        <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600')] bg-cover bg-center opacity-30"></div>
+        <h1 class="relative z-10 heading-font text-5xl md:text-7xl font-bold text-white uppercase tracking-widest">Derin <span class="text-blue-500">Uzay</span></h1>
+    </section>
+
+    <main class="max-w-7xl mx-auto px-6 py-20">
+        <div id="news-container" class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            </div>
+    </main>
+
+    <div id="admin-dashboard">
+        <div class="flex h-screen">
+            <aside class="w-64 bg-black/50 border-r border-white/10 flex flex-col p-6">
+                <h2 class="heading-font text-blue-500 font-bold mb-10">YÖNETİM</h2>
+                <nav class="flex-1 space-y-2">
+                    <button onclick="switchTab('stats')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-chart-line"></i> Özet</button>
+                    <button onclick="switchTab('news-list')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-edit"></i> Haberleri Yönet</button>
+                    <button onclick="switchTab('news-add')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-plus"></i> Yeni Haber</button>
+                    <button onclick="switchTab('admins')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-users-cog"></i> Adminler</button>
+                </nav>
+                <button onclick="location.reload()" class="bg-red-600/10 text-red-500 p-3 rounded-lg hover:bg-red-600 hover:text-white transition mt-auto">Çıkış Yap</button>
+            </aside>
+
+            <main class="flex-1 p-10 bg-[#0a0f1d] overflow-y-auto">
+                <div id="tab-stats" class="tab-content">
+                    <h2 class="text-3xl font-bold mb-8">Sistem Özeti</h2>
+                    <div class="grid grid-cols-2 gap-6 max-w-2xl">
+                        <div class="glass-card p-8 rounded-2xl">
+                            <p class="text-gray-400">Toplam Haber</p>
+                            <h3 id="stat-news" class="text-5xl font-bold text-blue-500">0</h3>
+                        </div>
+                        <div class="glass-card p-8 rounded-2xl">
+                            <p class="text-gray-400">Aktif Yönetici</p>
+                            <h3 id="stat-admins" class="text-5xl font-bold text-green-500">0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="tab-news-add" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6">Haber Yayınla</h2>
+                    <form id="news-form" class="space-y-4 max-w-2xl">
+                        <input type="hidden" id="edit-id">
+                        <input type="text" id="news-title" placeholder="Haber Başlığı" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-blue-500" required>
+                        <input type="text" id="news-img" placeholder="Resim URL" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-blue-500">
+                        <textarea id="news-desc" placeholder="Haber İçeriği" rows="6" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl outline-none focus:border-blue-500" required></textarea>
+                        <button type="submit" class="w-full bg-blue-600 p-4 rounded-xl font-bold hover:bg-blue-700 transition">KAYDET</button>
+                    </form>
+                </div>
+
+                <div id="tab-admins" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6">Yönetici Ekle</h2>
+                    <div class="flex gap-4 mb-10 max-w-xl">
+                        <input type="text" id="new-adm-user" placeholder="Kullanıcı Adı" class="bg-white/5 p-3 rounded-lg flex-1 outline-none border border-white/10">
+                        <input type="text" id="new-adm-pass" placeholder="Şifre" class="bg-white/5 p-3 rounded-lg flex-1 outline-none border border-white/10">
+                        <button onclick="addAdmin()" class="bg-green-600 px-6 rounded-lg font-bold">EKLE</button>
+                    </div>
+                    <div id="admin-list" class="space-y-2 max-w-xl"></div>
+                </div>
+
+                <div id="tab-news-list" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6">Haberleri Düzenle / Sil</h2>
+                    <div id="admin-news-grid" class="space-y-3"></div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        const SB_URL = 'https://pmfsrpbitvzghlbcthyf.supabase.co';
+        const SB_KEY = 'sb_publishable_0GMHm_mvNc-k4GxZS6FdOg_Wi83ZZsX';
+        const sb = supabase.createClient(SB_URL, SB_KEY);
+
+        let allNews = [];
+        let allAdmins = [];
+
+        async function init() {
+            const { data: news } = await sb.from('news').select('*').order('created_at', { ascending: false });
+            const { data: adms } = await sb.from('admins').select('*');
+            allNews = news || [];
+            allAdmins = adms || [];
+            render();
+        }
+
+        function render() {
+            // Ana Sayfa
+            document.getElementById('news-container').innerHTML = allNews.map(n => `
+                <div class="glass-card rounded-2xl overflow-hidden group">
+                    <img src="${n.img}" class="h-48 w-full object-cover group-hover:scale-110 transition duration-500">
+                    <div class="p-6">
+                        <h3 class="font-bold text-lg mb-2 text-white">${n.title}</h3>
+                        <p class="text-gray-400 text-sm line-clamp-3">${n.description}</p>
+                    </div>
+                </div>
+            `).join('');
+
+            // Admin Listesi
+            document.getElementById('admin-list').innerHTML = allAdmins.map(a => `
+                <div class="flex justify-between bg-white/5 p-4 rounded-xl border border-white/5">
+                    <span><i class="fas fa-user-shield text-blue-500 mr-2"></i> ${a.user_name}</span>
+                    <button onclick="delAdmin(${a.id})" class="text-red-500 hover:scale-110 transition"><i class="fas fa-trash"></i></button>
+                </div>
+            `).join('');
+
+            // Admin Haber Listesi
+            document.getElementById('admin-news-grid').innerHTML = allNews.map(n => `
+                <div class="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/5">
+                    <span class="truncate pr-4">${n.title}</span>
+                    <div class="flex gap-3">
+                        <button onclick="prepEdit(${n.id})" class="text-blue-400"><i class="fas fa-edit"></i></button>
+                        <button onclick="delNews(${n.id})" class="text-red-500"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `).join('');
+
+            document.getElementById('stat-news').innerText = allNews.length;
+            document.getElementById('stat-admins').innerText = allAdmins.length;
+        }
+
+        // Giriş
+        async function openLoginPrompt() {
+            const u = prompt("Admin Kullanıcı Adı:");
+            const p = prompt("Şifre:");
+            const { data } = await sb.from('admins').select('*').eq('user_name', u).eq('pass', p).single();
+            
+            if(data) {
+                document.getElementById('admin-dashboard').classList.add('active');
+                switchTab('stats');
+                showToast("Hoş geldin, " + u);
+            } else {
+                alert("Yetkisiz Erişim!");
+            }
+        }
+
+        // Haber Ekle / Güncelle
+        document.getElementById('news-form').onsubmit = async (e) => {
+            e.preventDefault();
+            const id = document.getElementById('edit-id').value;
+            const payload = {
+                title: document.getElementById('news-title').value,
+                description: document.getElementById('news-desc').value,
+                img: document.getElementById('news-img').value || 'https://images.unsplash.com/photo-1462331940025-496dfbfc7564?w=800'
+            };
+
+            if(id) {
+                await sb.from('news').update(payload).eq('id', id);
+            } else {
+                await sb.from('news').insert([payload]);
+            }
+            
+            document.getElementById('news-form').reset();
+            document.getElementById('edit-id').value = "";
+            showToast("İşlem Başarılı");
+            init();
+            switchTab('news-list');
+        };
+
+        // Silme İşlemleri
+        async function delNews(id) { if(confirm("Haber silinsin mi?")) { await sb.from('news').delete().eq('id', id); init(); } }
+        async function delAdmin(adminId) {
+    if(!adminId) {
+        alert("Hata: Silinecek adminin ID'si bulunamadı!");
+        return;
+    }
+
+    if(confirm("Bu yöneticinin yetkisini kaldırmak istediğinize emin misiniz?")) {
+        const { error } = await sb
+            .from('admins')
+            .delete()
+            .eq('id', adminId); 
+
+        if (error) {
+            alert("Supabase Silme Hatası: " + error.message);
+        } else {
+            showToast("Yönetici başarıyla kaldırıldı.");
+            // Listeyi veritabanından tekrar çekmek için:
+            const { data: freshAdmins } = await sb.from('admins').select('*');
+            allAdmins = freshAdmins || [];
+            render(); 
+        }
+    }
+}
+        // Admin Ekleme
+        async function addAdmin() {
+            const u = document.getElementById('new-adm-user').value;
+            const p = document.getElementById('new-adm-pass').value;
+            if(u && p) {
+                await sb.from('admins').insert([{ user_name: u, pass: p }]);
+                document.getElementById('new-adm-user').value = "";
+                document.getElementById('new-adm-pass').value = "";
+                init();
+            }
+        }
+
+        function prepEdit(id) {
+            const n = allNews.find(x => x.id === id);
+            document.getElementById('edit-id').value = n.id;
+            document.getElementById('news-title').value = n.title;
+            document.getElementById('news-desc').value = n.description;
+            document.getElementById('news-img').value = n.img;
+            switchTab('news-add');
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('.tab-content').forEach(x => x.classList.add('hidden'));
+            document.getElementById('tab-' + t).classList.remove('hidden');
+            document.querySelectorAll('.sidebar-link').forEach(l => {
+                l.classList.toggle('active', l.getAttribute('onclick').includes(t));
+            });
+        }
+
+        function showToast(m) {
+            const t = document.getElementById('toast');
+            t.innerText = m; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        window.onload = init;
+    </script>
+
+    <div id="toast" class="bg-blue-600 text-white px-8 py-4 rounded-2xl shadow-xl font-bold"></div>
+</body>
+</html>
