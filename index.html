@@ -33,15 +33,18 @@
 
     <nav class="fixed w-full z-50 bg-black/80 backdrop-blur-md border-b border-white/10 h-16 flex items-center justify-between px-6">
         <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
-            <i class="fas fa-rocket text-blue-500 text-2xl"></i>
-            <span class="heading-font text-xl font-bold text-white">ASTRO<span class="text-blue-500">HABER</span></span>
+            <i class="fas fa-shuttle-space text-blue-500 text-2xl"></i>
+            <span class="heading-font text-xl font-bold text-white">GALAKSİ<span class="text-blue-500">GÜNDEM</span></span>
         </div>
         <button onclick="openLoginPrompt()" class="text-gray-500 hover:text-white"><i class="fas fa-user-shield"></i></button>
     </nav>
 
     <section class="h-[50vh] flex items-center justify-center relative pt-16">
         <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600')] bg-cover bg-center opacity-30"></div>
-        <h1 class="relative z-10 heading-font text-5xl md:text-7xl font-bold text-white uppercase tracking-widest">Derin <span class="text-blue-500">Uzay</span></h1>
+        <div class="text-center relative z-10">
+            <h1 class="heading-font text-5xl md:text-7xl font-bold text-white uppercase tracking-widest">Galaksi <span class="text-blue-500">Gündem</span></h1>
+            <p class="text-gray-400 mt-4 tracking-[0.5rem] uppercase text-sm">Evrenin Nabzını Tutun</p>
+        </div>
     </section>
 
     <main class="max-w-7xl mx-auto px-6 py-20">
@@ -52,7 +55,7 @@
     <div id="admin-dashboard">
         <div class="flex h-screen">
             <aside class="w-64 bg-black/50 border-r border-white/10 flex flex-col p-6">
-                <h2 class="heading-font text-blue-500 font-bold mb-10">YÖNETİM</h2>
+                <h2 class="heading-font text-blue-500 font-bold mb-10 text-center">GG PANEL</h2>
                 <nav class="flex-1 space-y-2">
                     <button onclick="switchTab('stats')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-chart-line"></i> Özet</button>
                     <button onclick="switchTab('news-list')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-edit"></i> Haberleri Yönet</button>
@@ -198,28 +201,27 @@
         // Silme İşlemleri
         async function delNews(id) { if(confirm("Haber silinsin mi?")) { await sb.from('news').delete().eq('id', id); init(); } }
         async function delAdmin(adminId) {
-    if(!adminId) {
-        alert("Hata: Silinecek adminin ID'si bulunamadı!");
-        return;
-    }
+            if(!adminId) {
+                alert("Hata: Silinecek adminin ID'si bulunamadı!");
+                return;
+            }
 
-    if(confirm("Bu yöneticinin yetkisini kaldırmak istediğinize emin misiniz?")) {
-        const { error } = await sb
-            .from('admins')
-            .delete()
-            .eq('id', adminId); 
+            if(confirm("Bu yöneticinin yetkisini kaldırmak istediğinize emin misiniz?")) {
+                const { error } = await sb
+                    .from('admins')
+                    .delete()
+                    .eq('id', adminId); 
 
-        if (error) {
-            alert("Supabase Silme Hatası: " + error.message);
-        } else {
-            showToast("Yönetici başarıyla kaldırıldı.");
-            // Listeyi veritabanından tekrar çekmek için:
-            const { data: freshAdmins } = await sb.from('admins').select('*');
-            allAdmins = freshAdmins || [];
-            render(); 
+                if (error) {
+                    alert("Supabase Silme Hatası: " + error.message);
+                } else {
+                    showToast("Yönetici başarıyla kaldırıldı.");
+                    const { data: freshAdmins } = await sb.from('admins').select('*');
+                    allAdmins = freshAdmins || [];
+                    render(); 
+                }
+            }
         }
-    }
-}
         // Admin Ekleme
         async function addAdmin() {
             const u = document.getElementById('new-adm-user').value;
