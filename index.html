@@ -14,19 +14,12 @@
         .heading-font { font-family: 'Orbitron', sans-serif; }
         .glass-card { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
         
-        /* Dashboard */
         #admin-dashboard { display: none; position: fixed; inset: 0; z-index: 500; background: var(--admin-bg); overflow-y: auto; }
         #admin-dashboard.active { display: block; }
         .sidebar-link.active { background: rgba(59, 130, 246, 0.1); border-right: 4px solid var(--space-blue); color: var(--space-blue); }
         
-        /* Modals & Toasts */
-        #news-modal { display: none; position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.9); align-items: center; justify-content: center; }
-        #news-modal.active { display: flex; }
         #toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px); opacity: 0; transition: all 0.4s; z-index: 1000; }
         #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-        
-        .admin-only { display: none; }
-        body.is-admin .admin-only { display: flex; }
     </style>
 </head>
 <body class="overflow-x-hidden">
@@ -36,7 +29,7 @@
             <i class="fas fa-shuttle-space text-blue-500 text-2xl"></i>
             <span class="heading-font text-xl font-bold text-white">GALAKSİ<span class="text-blue-500">GÜNDEM</span></span>
         </div>
-        <button onclick="openLoginPrompt()" class="text-gray-500 hover:text-white"><i class="fas fa-user-shield"></i></button>
+        <button onclick="openLoginPrompt()" class="text-gray-500 hover:text-white"><i class="fas fa-user-shield text-xl"></i></button>
     </nav>
 
     <section class="h-[50vh] flex items-center justify-center relative pt-16">
@@ -48,16 +41,17 @@
     </section>
 
     <main class="max-w-7xl mx-auto px-6 py-20">
-        <div id="news-container" class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            </div>
+        <div id="news-container" class="grid grid-cols-1 md:grid-cols-3 gap-8"></div>
     </main>
 
+    <!-- ADMIN PANEL -->
     <div id="admin-dashboard">
         <div class="flex h-screen">
             <aside class="w-64 bg-black/50 border-r border-white/10 flex flex-col p-6">
                 <h2 class="heading-font text-blue-500 font-bold mb-10 text-center">GG PANEL</h2>
                 <nav class="flex-1 space-y-2">
                     <button onclick="switchTab('stats')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-chart-line"></i> Özet</button>
+                    <button onclick="switchTab('ai-bot')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-satellite"></i> Canlı API Botu</button>
                     <button onclick="switchTab('news-list')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-edit"></i> Haberleri Yönet</button>
                     <button onclick="switchTab('news-add')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-plus"></i> Yeni Haber</button>
                     <button onclick="switchTab('admins')" class="sidebar-link w-full text-left p-3 rounded-lg flex items-center gap-3"><i class="fas fa-users-cog"></i> Adminler</button>
@@ -77,6 +71,26 @@
                             <p class="text-gray-400">Aktif Yönetici</p>
                             <h3 id="stat-admins" class="text-5xl font-bold text-green-500">0</h3>
                         </div>
+                    </div>
+                </div>
+
+                <!-- API BOT KONTROL SEKMESİ -->
+                <div id="tab-ai-bot" class="tab-content hidden">
+                    <h2 class="text-2xl font-bold mb-6"><i class="fas fa-satellite text-blue-500"></i> Spaceflight News Canlı API Botu</h2>
+                    <div class="glass-card p-6 rounded-2xl max-w-xl space-y-6">
+                        <p class="text-gray-300 text-sm">Bu bot doğrudan küresel uzay haberleri API'sine (`Spaceflight News API`) bağlanır. Tetiklendiğinde eski kayıtları tamamen temizler ve en güncel 10 haberi anında siteye yükler.</p>
+                        
+                        <div class="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/10">
+                            <div>
+                                <h4 class="font-bold">Otomatik API Senkronizasyonu</h4>
+                                <p id="bot-status-text" class="text-sm text-gray-400">Yükleniyor...</p>
+                            </div>
+                            <button id="bot-toggle-btn" onclick="toggleApiBot()" class="px-6 py-2 rounded-xl font-bold transition"></button>
+                        </div>
+
+                        <button onclick="forceRunApiBotNow()" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl font-bold transition">
+                            <i class="fas fa-sync-alt mr-2"></i> Eski Kayıtları Sil ve Canlı API'den 10 Yeni Haber Çek
+                        </button>
                     </div>
                 </div>
 
@@ -116,17 +130,22 @@
 
         let allNews = [];
         let allAdmins = [];
+        let isBotActive = false;
 
         async function init() {
             const { data: news } = await sb.from('news').select('*').order('created_at', { ascending: false });
             const { data: adms } = await sb.from('admins').select('*');
+            const { data: settings } = await sb.from('settings').select('*').eq('key', 'auto_update_enabled').single();
+            
             allNews = news || [];
             allAdmins = adms || [];
+            isBotActive = settings ? settings.value === 'true' : false;
+
             render();
+            checkAndRunAutomaticApiBot();
         }
 
         function render() {
-            // Ana Sayfa
             document.getElementById('news-container').innerHTML = allNews.map(n => `
                 <div class="glass-card rounded-2xl overflow-hidden group">
                     <img src="${n.img}" class="h-48 w-full object-cover group-hover:scale-110 transition duration-500">
@@ -137,7 +156,6 @@
                 </div>
             `).join('');
 
-            // Admin Listesi
             document.getElementById('admin-list').innerHTML = allAdmins.map(a => `
                 <div class="flex justify-between bg-white/5 p-4 rounded-xl border border-white/5">
                     <span><i class="fas fa-user-shield text-blue-500 mr-2"></i> ${a.user_name}</span>
@@ -145,7 +163,6 @@
                 </div>
             `).join('');
 
-            // Admin Haber Listesi
             document.getElementById('admin-news-grid').innerHTML = allNews.map(n => `
                 <div class="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/5">
                     <span class="truncate pr-4">${n.title}</span>
@@ -158,9 +175,83 @@
 
             document.getElementById('stat-news').innerText = allNews.length;
             document.getElementById('stat-admins').innerText = allAdmins.length;
+
+            const btn = document.getElementById('bot-toggle-btn');
+            const txt = document.getElementById('bot-status-text');
+            if(isBotActive) {
+                txt.innerText = "Canlı API Botu Aktif: Günlük gerçek veri akışı açık.";
+                btn.innerText = "DURDUR";
+                btn.className = "px-6 py-2 rounded-xl font-bold bg-red-600 hover:bg-red-700 text-white";
+            } else {
+                txt.innerText = "Canlı API Botu Kapalı.";
+                btn.innerText = "BAŞLAT";
+                btn.className = "px-6 py-2 rounded-xl font-bold bg-green-600 hover:bg-green-700 text-white";
+            }
         }
 
-        // Giriş
+        async function toggleApiBot() {
+            isBotActive = !isBotActive;
+            await sb.from('settings').update({ value: isBotActive.toString() }).eq('key', 'auto_update_enabled');
+            showToast(isBotActive ? "Canlı API Botu Başlatıldı!" : "Canlı API Botu Durduruldu!");
+            render();
+        }
+
+        async function checkAndRunAutomaticApiBot() {
+            if (!isBotActive) return;
+
+            const lastNewsDate = allNews.length > 0 ? new Date(allNews[0].created_at) : new Date(0);
+            const now = new Date();
+            const diffHours = (now - lastNewsDate) / (1000 * 60 * 60);
+
+            if (diffHours >= 24) {
+                await fetchLiveSpaceApiNews();
+            }
+        }
+
+        // GERÇEK SPACEFLIGHT NEWS API'DEN VERİ ÇEKME
+        async function fetchLiveSpaceApiNews() {
+            showToast("Canlı Uzay API'sine bağlanılıyor...");
+
+            try {
+                const response = await fetch('https://api.spaceflightnewsapi.net/v4/articles/?limit=10');
+                
+                if (!response.ok) {
+                    throw new Error("API yanıt vermedi.");
+                }
+
+                const data = await response.json();
+                const articles = data.results || [];
+
+                if (articles.length === 0) {
+                    throw new Error("API'den haber dönmedi.");
+                }
+
+                // 1. ESKİ HABERLERİN TÜMÜNÜ SİL
+                await sb.from('news').delete().neq('id', 0);
+
+                // 2. GELEN VERİLERİ DÜZENLE
+                const liveNewsBatch = articles.map(item => ({
+                    title: item.title || "Güncel Uzay Gelişmesi",
+                    description: item.summary || item.news_site + " tarafından yayınlanan son dakika uzay araştırması haberi.",
+                    img: item.image_url || "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=800"
+                }));
+
+                // 3. SUPABASE'E KAYDET
+                await sb.from('news').insert(liveNewsBatch);
+
+                showToast("Eski haberler silindi ve canlı API'den 10 yeni haber çekildi!");
+                init();
+
+            } catch (error) {
+                console.error("API Hatası:", error);
+                showToast("Canlı API verisi çekilemedi, lütfen tekrar deneyin.");
+            }
+        }
+
+        async function forceRunApiBotNow() {
+            await fetchLiveSpaceApiNews();
+        }
+
         async function openLoginPrompt() {
             const u = prompt("Admin Kullanıcı Adı:");
             const p = prompt("Şifre:");
@@ -175,7 +266,6 @@
             }
         }
 
-        // Haber Ekle / Güncelle
         document.getElementById('news-form').onsubmit = async (e) => {
             e.preventDefault();
             const id = document.getElementById('edit-id').value;
@@ -198,31 +288,15 @@
             switchTab('news-list');
         };
 
-        // Silme İşlemleri
         async function delNews(id) { if(confirm("Haber silinsin mi?")) { await sb.from('news').delete().eq('id', id); init(); } }
         async function delAdmin(adminId) {
-            if(!adminId) {
-                alert("Hata: Silinecek adminin ID'si bulunamadı!");
-                return;
-            }
-
             if(confirm("Bu yöneticinin yetkisini kaldırmak istediğinize emin misiniz?")) {
-                const { error } = await sb
-                    .from('admins')
-                    .delete()
-                    .eq('id', adminId); 
-
-                if (error) {
-                    alert("Supabase Silme Hatası: " + error.message);
-                } else {
-                    showToast("Yönetici başarıyla kaldırıldı.");
-                    const { data: freshAdmins } = await sb.from('admins').select('*');
-                    allAdmins = freshAdmins || [];
-                    render(); 
-                }
+                await sb.from('admins').delete().eq('id', adminId);
+                showToast("Yönetici kaldırıldı.");
+                init();
             }
         }
-        // Admin Ekleme
+
         async function addAdmin() {
             const u = document.getElementById('new-adm-user').value;
             const p = document.getElementById('new-adm-pass').value;
@@ -259,7 +333,6 @@
 
         window.onload = init;
     </script>
-
     <div id="toast" class="bg-blue-600 text-white px-8 py-4 rounded-2xl shadow-xl font-bold"></div>
 </body>
 </html>
