@@ -3,8 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Galaksi Gündem</title>
+    <title>Galaksi Gündem — Uzay, Astronomi ve Teknoloji Haberleri</title>
     <meta name="description" content="Eğer astronomi, uzay ve teknolojiye merakınız varsa aradığınız yer Galaksi Gündem. Uzay ve teknolojik bilgileri istediğiniz zaman 7/24 öğrenebilirsiniz.">
+    <meta name="keywords" content="Galaksi Gündem, uzay haberleri, astronomi, teknoloji, roket, NASA, ESA, evren">
+    <meta name="robots" content="index, follow">
+    <link rel="canonical" href="https://eko-ai337.github.io/Galaksi-G-ndem/">
+
+    <!-- Favicon (İsteğe bağlı olarak repo köküne favicon.png yükleyebilirsiniz) -->
+    <link rel="icon" type="image/png" href="https://eko-ai337.github.io/Galaksi-G-ndem/favicon.png">
+
+    <!-- Open Graph (WhatsApp / Facebook / LinkedIn) -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://eko-ai337.github.io/Galaksi-G-ndem/">
+    <meta property="og:title" content="Galaksi Gündem — Uzay, Astronomi ve Teknoloji Haberleri">
+    <meta property="og:description" content="Eğer astronomi, uzay ve teknolojiye merakınız varsa aradığınız yer Galaksi Gündem. Uzay ve teknolojik bilgileri istediğiniz zaman 7/24 öğrenebilirsiniz.">
+    <meta property="og:image" content="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200">
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:url" content="https://eko-ai337.github.io/Galaksi-G-ndem/">
+    <meta name="twitter:title" content="Galaksi Gündem — Uzay, Astronomi ve Teknoloji Haberleri">
+    <meta name="twitter:description" content="Eğer astronomi, uzay ve teknolojiye merakınız varsa aradığınız yer Galaksi Gündem. Uzay ve teknolojik bilgileri istediğiniz zaman 7/24 öğrenebilirsiniz.">
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200">
+
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -179,6 +200,12 @@
         const SB_KEY = 'sb_publishable_0GMHm_mvNc-k4GxZS6FdOg_Wi83ZZsX';
         const sb = supabase.createClient(SB_URL, SB_KEY);
 
+        const DEFAULT_SEO = {
+            title: "Galaksi Gündem — Uzay, Astronomi ve Teknoloji Haberleri",
+            description: "Eğer astronomi, uzay ve teknolojiye merakınız varsa aradığınız yer Galaksi Gündem. Uzay ve teknolojik bilgileri istediğiniz zaman 7/24 öğrenebilirsiniz.",
+            image: "https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1200"
+        };
+
         let allNews = [];
         let currentLang = localStorage.getItem('gg_lang') || 'tr';
         let currentTheme = localStorage.getItem('gg_theme') || 'dark';
@@ -216,6 +243,30 @@
                 save_close: "Guardar y Cerrar", subtitle: "Mantén el pulso del universo"
             }
         };
+
+        function setMetaContent(selector, value) {
+            const el = document.querySelector(selector);
+            if (el && value) {
+                el.setAttribute('content', value);
+            }
+        }
+
+        function updateSeoMeta({ title, description, image }) {
+            const finalTitle = title ? `${title} | Galaksi Gündem` : DEFAULT_SEO.title;
+            const finalDesc = description
+                ? String(description).replace(/\s+/g, ' ').trim().slice(0, 160)
+                : DEFAULT_SEO.description;
+            const finalImage = image || DEFAULT_SEO.image;
+
+            document.title = finalTitle;
+            setMetaContent('meta[name="description"]', finalDesc);
+            setMetaContent('meta[property="og:title"]', finalTitle);
+            setMetaContent('meta[property="og:description"]', finalDesc);
+            setMetaContent('meta[property="og:image"]', finalImage);
+            setMetaContent('meta[name="twitter:title"]', finalTitle);
+            setMetaContent('meta[name="twitter:description"]', finalDesc);
+            setMetaContent('meta[name="twitter:image"]', finalImage);
+        }
 
         async function translateText(text, targetLang) {
             if (!text || targetLang === 'tr') return text;
@@ -282,6 +333,7 @@
         async function changeLanguage(lang) {
             currentLang = lang;
             localStorage.setItem('gg_lang', lang);
+            document.documentElement.lang = lang;
             updateTexts();
             render();
             showToast("Dil değiştirildi!");
@@ -303,28 +355,67 @@
             container.innerHTML = `<p class="col-span-full text-center opacity-70 py-10"><i class="fas fa-spinner fa-spin mr-2"></i> ${currentLang === 'tr' ? 'Haberler yükleniyor...' : 'Loading news...'}</p>`;
 
             let renderedHTML = "";
-            for (let n of allNews) {
+            let firstTranslatedTitle = "";
+            let firstTranslatedDesc = "";
+            let firstImg = "";
+
+            for (let i = 0; i < allNews.length; i++) {
+                const n = allNews[i];
                 const translatedTitle = await translateText(n.title, currentLang);
                 const translatedDesc = await translateText(n.description, currentLang);
+                const safeTitle = escapeHtml(translatedTitle);
+                const safeDesc = escapeHtml(translatedDesc);
+                const safeImg = escapeHtml(n.img);
+
+                if (i === 0) {
+                    firstTranslatedTitle = translatedTitle;
+                    firstTranslatedDesc = translatedDesc;
+                    firstImg = n.img;
+                }
+
                 renderedHTML += `
                     <div onclick="openDetail(${n.id})" class="glass-card rounded-2xl overflow-hidden group cursor-pointer hover:border-blue-500/50 transition duration-300">
-                        <img src="${escapeHtml(n.img)}" class="h-48 w-full object-cover group-hover:scale-105 transition duration-500" alt="">
+                        <img src="${safeImg}" class="h-48 w-full object-cover group-hover:scale-105 transition duration-500" alt="${safeTitle || 'Galaksi Gündem Haber Görseli'}">
                         <div class="p-6">
-                            <h3 class="font-bold text-lg mb-2 heading-font">${escapeHtml(translatedTitle)}</h3>
-                            <p class="opacity-80 text-sm line-clamp-3">${escapeHtml(translatedDesc)}</p>
+                            <h3 class="font-bold text-lg mb-2 heading-font">${safeTitle}</h3>
+                            <p class="opacity-80 text-sm line-clamp-3">${safeDesc}</p>
                         </div>
                     </div>
                 `;
             }
+
             container.innerHTML = renderedHTML || `<p class="col-span-full text-center opacity-70 py-10">${currentLang === 'tr' ? 'Henüz haber yok.' : 'No news yet.'}</p>`;
+
+            if (firstTranslatedTitle) {
+                updateSeoMeta({
+                    title: `${firstTranslatedTitle} — Galaksi Gündem`,
+                    description: firstTranslatedDesc || DEFAULT_SEO.description,
+                    image: firstImg || DEFAULT_SEO.image
+                });
+                document.title = `${firstTranslatedTitle} | Galaksi Gündem`;
+            } else {
+                updateSeoMeta(DEFAULT_SEO);
+            }
         }
 
         async function openDetail(id) {
             const n = allNews.find(x => x.id === id);
             if (!n) return;
-            document.getElementById('detail-title').innerText = await translateText(n.title, currentLang);
-            document.getElementById('detail-img').src = n.img;
-            document.getElementById('detail-desc').innerText = await translateText(n.description, currentLang);
+            const titleText = await translateText(n.title, currentLang);
+            const descText = await translateText(n.description, currentLang);
+
+            document.getElementById('detail-title').innerText = titleText;
+            const detailImg = document.getElementById('detail-img');
+            detailImg.src = n.img;
+            detailImg.alt = titleText || 'Haber Görseli';
+            document.getElementById('detail-desc').innerText = descText;
+
+            updateSeoMeta({
+                title: titleText,
+                description: descText,
+                image: n.img
+            });
+
             document.getElementById('view-home').classList.add('hidden');
             document.getElementById('view-detail').classList.remove('hidden');
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -333,6 +424,7 @@
         function goHome() {
             document.getElementById('view-detail').classList.add('hidden');
             document.getElementById('view-home').classList.remove('hidden');
+            updateSeoMeta(DEFAULT_SEO);
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
