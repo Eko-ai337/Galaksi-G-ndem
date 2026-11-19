@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://eko-ai337.github.io/Galaksi-G-ndem/sitemap.xml
