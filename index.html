@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Galaksi Gündem</title>
+    <meta name="description" content="Eğer astronomi, uzay ve teknolojiye merakınız varsa aradığınız yer Galaksi Gündem. Uzay ve teknolojik bilgileri istediğiniz zaman 7/24 öğrenebilirsiniz.">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Inter:wght@300;400;600&display=swap');
+
+        :root {
+            --space-black: #05070a;
+            --space-blue: #3b82f6;
+            --bg-color: #05070a;
+            --text-color: #e2e8f0;
+            --heading-color: #ffffff;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --modal-bg: #0f172a;
+            --modal-text: #f8fafc;
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-text: #ffffff;
+            --nav-bg: rgba(0, 0, 0, 0.9);
+        }
+
+        body.theme-light {
+            --space-black: #f8fafc;
+            --space-blue: #2563eb;
+            --bg-color: #f8fafc;
+            --text-color: #334155;
+            --heading-color: #0f172a;
+            --card-bg: #ffffff;
+            --card-border: #cbd5e1;
+            --modal-bg: #ffffff;
+            --modal-text: #0f172a;
+            --input-bg: #f1f5f9;
+            --input-text: #0f172a;
+            --nav-bg: rgba(255, 255, 255, 0.95);
+        }
+
+        body.skin-liquid .glass-card {
+            background: rgba(255, 255, 255, 0.07);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        body.theme-light.skin-liquid .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        body.skin-cyberpunk .glass-card {
+            background: rgba(15, 23, 42, 0.9);
+            border: 2px solid #06b6d4;
+            box-shadow: 0 0 15px rgba(6, 182, 212, 0.3);
+            color: #e2e8f0;
+        }
+        body.theme-light.skin-cyberpunk .glass-card {
+            background: #ffffff;
+            border: 2px solid #0891b2;
+            box-shadow: 0 0 15px rgba(8, 145, 178, 0.2);
+            color: #0f172a;
+        }
+        body.theme-light.skin-cyberpunk .glass-card p { color: #334155; }
+
+        body.skin-minimalist .glass-card {
+            background: transparent;
+            backdrop-filter: none;
+            border: 1px solid var(--card-border);
+            box-shadow: none;
+        }
+
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Inter', sans-serif; transition: background 0.3s, color 0.3s; -webkit-tap-highlight-color: transparent; }
+        .heading-font { font-family: 'Orbitron', sans-serif; color: var(--heading-color); transition: color 0.3s; }
+        .glass-card { background: var(--card-bg); backdrop-filter: blur(12px); border: 1px solid var(--card-border); transition: all 0.3s; }
+
+        #preferences-modal { display: none; position: fixed; inset: 0; z-index: 700; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); align-items: center; justify-content: center; }
+        #preferences-modal.active { display: flex; }
+        .modal-content { background: var(--modal-bg); color: var(--modal-text); border: 1px solid var(--card-border); }
+        .theme-input { background: var(--input-bg); color: var(--input-text); border: 1px solid var(--card-border); }
+
+        #toast { position: fixed; bottom: 2rem; left: 50%; transform: translateX(-50%) translateY(100px); opacity: 0; transition: all 0.4s; z-index: 1000; }
+        #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    </style>
+</head>
+<body class="overflow-x-hidden theme-dark skin-normal">
+
+    <nav class="fixed w-full z-50 backdrop-blur-md border-b border-white/10 h-16 flex items-center justify-between px-4 sm:px-6" style="background: var(--nav-bg);">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="goHome()">
+            <i class="fas fa-shuttle-space text-blue-500 text-2xl"></i>
+            <span class="heading-font text-lg sm:text-xl font-bold">GALAKSİ<span class="text-blue-500">GÜNDEM</span></span>
+        </div>
+        <button onclick="openPreferences()" class="theme-input px-3 py-2 rounded-xl text-sm flex items-center gap-2 transition">
+            <i class="fas fa-sliders-h text-blue-500"></i>
+            <span class="hidden sm:inline" data-i18n="pref_btn">Tercihler</span>
+        </button>
+    </nav>
+
+    <div id="preferences-modal">
+        <div class="modal-content w-full max-w-lg p-6 sm:p-8 rounded-3xl m-4 relative space-y-6 shadow-2xl">
+            <div class="flex justify-between items-center border-b border-gray-500/20 pb-4">
+                <h3 class="heading-font text-xl font-bold flex items-center gap-2">
+                    <i class="fas fa-cog text-blue-500"></i> <span data-i18n="pref_title">Sistem Tercihleri</span>
+                </h3>
+                <button onclick="closePreferences()" class="opacity-60 hover:opacity-100 text-xl"><i class="fas fa-times"></i></button>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-semibold opacity-80" data-i18n="theme_label">Tema</label>
+                <div class="grid grid-cols-3 gap-3">
+                    <button onclick="setTheme('dark')" class="theme-input p-3 rounded-xl font-medium text-sm transition" data-i18n="theme_dark">Karanlık</button>
+                    <button onclick="setTheme('light')" class="theme-input p-3 rounded-xl font-medium text-sm transition" data-i18n="theme_light">Aydınlık</button>
+                    <button onclick="setTheme('system')" class="theme-input p-3 rounded-xl font-medium text-sm transition" data-i18n="theme_system">Sistem</button>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-semibold opacity-80" data-i18n="lang_label">Dil / Language</label>
+                <select id="language-select" onchange="changeLanguage(this.value)" class="theme-input w-full p-3 rounded-xl outline-none focus:border-blue-500">
+                    <option value="tr">🇹🇷 Türkçe</option>
+                    <option value="en">🇬🇧 English</option>
+                    <option value="de">🇩🇪 Deutsch</option>
+                    <option value="fr">🇫🇷 Français</option>
+                    <option value="es">🇪🇸 Español</option>
+                </select>
+            </div>
+
+            <div class="space-y-2">
+                <label class="text-sm font-semibold opacity-80" data-i18n="skin_label">Görünüm Tasarımı</label>
+                <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    <button onclick="setSkin('normal')" class="theme-input p-2.5 rounded-xl text-xs font-medium transition">Normal</button>
+                    <button onclick="setSkin('liquid')" class="theme-input p-2.5 rounded-xl text-xs font-medium transition">Liquid Glass</button>
+                    <button onclick="setSkin('cyberpunk')" class="theme-input p-2.5 rounded-xl text-xs font-medium transition">Cyberpunk</button>
+                    <button onclick="setSkin('minimalist')" class="theme-input p-2.5 rounded-xl text-xs font-medium transition">Minimalist</button>
+                </div>
+            </div>
+
+            <button onclick="closePreferences()" class="w-full bg-blue-600 hover:bg-blue-700 text-white p-3 rounded-xl font-bold transition" data-i18n="save_close">Kaydet ve Kapat</button>
+        </div>
+    </div>
+
+    <div id="view-home">
+        <section class="h-[45vh] sm:h-[50vh] flex items-center justify-center relative pt-16 px-4">
+            <div class="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=1600')] bg-cover bg-center opacity-30"></div>
+            <div class="text-center relative z-10 max-w-4xl">
+                <h1 class="heading-font text-4xl sm:text-6xl md:text-7xl font-bold uppercase tracking-widest">Galaksi <span class="text-blue-500">Gündem</span></h1>
+                <p class="opacity-70 mt-4 tracking-[0.3em] sm:tracking-[0.5rem] uppercase text-xs sm:text-sm" data-i18n="subtitle">Evrenin Nabzını Tutun</p>
+            </div>
+        </section>
+
+        <main class="max-w-7xl mx-auto px-4 sm:px-6 py-12 sm:py-20">
+            <div id="news-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8"></div>
+        </main>
+    </div>
+
+    <div id="view-detail" class="hidden min-h-screen pt-24 pb-20 px-4 sm:px-6 max-w-4xl mx-auto relative">
+        <button onclick="goHome()" class="absolute top-24 left-4 sm:left-0 theme-input w-12 h-12 rounded-full flex items-center justify-center transition">
+            <i class="fas fa-arrow-left text-lg"></i>
+        </button>
+
+        <div class="space-y-6 sm:space-y-8 mt-12 md:mt-0">
+            <h1 id="detail-title" class="heading-font text-2xl sm:text-4xl md:text-5xl font-bold leading-tight"></h1>
+            <div class="rounded-3xl overflow-hidden glass-card">
+                <img id="detail-img" class="w-full max-h-[450px] object-cover" src="" alt="Haber Görseli">
+            </div>
+            <div class="glass-card p-6 sm:p-8 rounded-3xl">
+                <p id="detail-desc" class="text-base sm:text-lg leading-relaxed whitespace-pre-line"></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="bg-blue-600 text-white px-8 py-4 rounded-2xl shadow-xl font-bold"></div>
+
+    <script>
+        const SB_URL = 'https://pmfsrpbitvzghlbcthyf.supabase.co';
+        const SB_KEY = 'sb_publishable_0GMHm_mvNc-k4GxZS6FdOg_Wi83ZZsX';
+        const sb = supabase.createClient(SB_URL, SB_KEY);
+
+        let allNews = [];
+        let currentLang = localStorage.getItem('gg_lang') || 'tr';
+        let currentTheme = localStorage.getItem('gg_theme') || 'dark';
+        let currentSkin = localStorage.getItem('gg_skin') || 'normal';
+
+        const translations = {
+            tr: {
+                pref_btn: "Tercihler", pref_title: "Sistem Tercihleri",
+                theme_label: "Tema", theme_dark: "Karanlık", theme_light: "Aydınlık", theme_system: "Sistem",
+                lang_label: "Dil / Language", skin_label: "Görünüm Tasarımı",
+                save_close: "Kaydet ve Kapat", subtitle: "Evrenin Nabzını Tutun"
+            },
+            en: {
+                pref_btn: "Preferences", pref_title: "System Preferences",
+                theme_label: "Theme", theme_dark: "Dark", theme_light: "Light", theme_system: "System",
+                lang_label: "Language", skin_label: "UI Skin",
+                save_close: "Save and Close", subtitle: "Keep Your Finger on the Universe"
+            },
+            de: {
+                pref_btn: "Einstellungen", pref_title: "Systemeinstellungen",
+                theme_label: "Thema", theme_dark: "Dunkel", theme_light: "Hell", theme_system: "System",
+                lang_label: "Sprache", skin_label: "Design Skin",
+                save_close: "Speichern & Schließen", subtitle: "Halte den Puls des Universums"
+            },
+            fr: {
+                pref_btn: "Préférences", pref_title: "Préférences Système",
+                theme_label: "Thème", theme_dark: "Sombre", theme_light: "Clair", theme_system: "Système",
+                lang_label: "Langue", skin_label: "Apparence",
+                save_close: "Enregistrer & Fermer", subtitle: "Gardez le pouls de l'univers"
+            },
+            es: {
+                pref_btn: "Preferencias", pref_title: "Preferencias del Sistema",
+                theme_label: "Tema", theme_dark: "Oscuro", theme_light: "Claro", theme_system: "Sistema",
+                lang_label: "Idioma", skin_label: "Estilo",
+                save_close: "Guardar y Cerrar", subtitle: "Mantén el pulso del universo"
+            }
+        };
+
+        async function translateText(text, targetLang) {
+            if (!text || targetLang === 'tr') return text;
+            try {
+                const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=en|${targetLang}`);
+                const data = await res.json();
+                if (data && data.responseData && data.responseData.translatedText) {
+                    return data.responseData.translatedText;
+                }
+                return text;
+            } catch (e) {
+                return text;
+            }
+        }
+
+        function escapeHtml(str) {
+            return String(str ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        async function init() {
+            applyTheme(currentTheme);
+            applySkin(currentSkin);
+            document.getElementById('language-select').value = currentLang;
+            updateTexts();
+
+            const { data: news } = await sb.from('news').select('*').order('created_at', { ascending: false });
+            allNews = news || [];
+            render();
+        }
+
+        function setTheme(theme) {
+            currentTheme = theme;
+            localStorage.setItem('gg_theme', theme);
+            applyTheme(theme);
+            showToast("Tema güncellendi!");
+        }
+
+        function applyTheme(theme) {
+            document.body.classList.remove('theme-dark', 'theme-light');
+            if (theme === 'system') {
+                const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+                document.body.classList.add(prefersDark ? 'theme-dark' : 'theme-light');
+            } else {
+                document.body.classList.add('theme-' + theme);
+            }
+        }
+
+        function setSkin(skin) {
+            currentSkin = skin;
+            localStorage.setItem('gg_skin', skin);
+            applySkin(skin);
+            showToast("Görünüm güncellendi!");
+        }
+
+        function applySkin(skin) {
+            document.body.classList.remove('skin-normal', 'skin-liquid', 'skin-cyberpunk', 'skin-minimalist');
+            document.body.classList.add('skin-' + skin);
+        }
+
+        async function changeLanguage(lang) {
+            currentLang = lang;
+            localStorage.setItem('gg_lang', lang);
+            updateTexts();
+            render();
+            showToast("Dil değiştirildi!");
+        }
+
+        function updateTexts() {
+            const t = translations[currentLang] || translations.tr;
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (t[key]) el.innerText = t[key];
+            });
+        }
+
+        function openPreferences() { document.getElementById('preferences-modal').classList.add('active'); }
+        function closePreferences() { document.getElementById('preferences-modal').classList.remove('active'); }
+
+        async function render() {
+            const container = document.getElementById('news-container');
+            container.innerHTML = `<p class="col-span-full text-center opacity-70 py-10"><i class="fas fa-spinner fa-spin mr-2"></i> ${currentLang === 'tr' ? 'Haberler yükleniyor...' : 'Loading news...'}</p>`;
+
+            let renderedHTML = "";
+            for (let n of allNews) {
+                const translatedTitle = await translateText(n.title, currentLang);
+                const translatedDesc = await translateText(n.description, currentLang);
+                renderedHTML += `
+                    <div onclick="openDetail(${n.id})" class="glass-card rounded-2xl overflow-hidden group cursor-pointer hover:border-blue-500/50 transition duration-300">
+                        <img src="${escapeHtml(n.img)}" class="h-48 w-full object-cover group-hover:scale-105 transition duration-500" alt="">
+                        <div class="p-6">
+                            <h3 class="font-bold text-lg mb-2 heading-font">${escapeHtml(translatedTitle)}</h3>
+                            <p class="opacity-80 text-sm line-clamp-3">${escapeHtml(translatedDesc)}</p>
+                        </div>
+                    </div>
+                `;
+            }
+            container.innerHTML = renderedHTML || `<p class="col-span-full text-center opacity-70 py-10">${currentLang === 'tr' ? 'Henüz haber yok.' : 'No news yet.'}</p>`;
+        }
+
+        async function openDetail(id) {
+            const n = allNews.find(x => x.id === id);
+            if (!n) return;
+            document.getElementById('detail-title').innerText = await translateText(n.title, currentLang);
+            document.getElementById('detail-img').src = n.img;
+            document.getElementById('detail-desc').innerText = await translateText(n.description, currentLang);
+            document.getElementById('view-home').classList.add('hidden');
+            document.getElementById('view-detail').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function goHome() {
+            document.getElementById('view-detail').classList.add('hidden');
+            document.getElementById('view-home').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function showToast(m) {
+            const t = document.getElementById('toast');
+            t.innerText = m; t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        window.onload = init;
+    </script>
+</body>
+</html>
